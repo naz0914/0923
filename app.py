@@ -22,6 +22,7 @@ from database import init_db, get_all_regions, get_forecast_by_region, get_all_f
 from fetch_weather import update_weather_pipeline
 from components.charts import create_temperature_trend_chart
 from components.map_view import create_taiwan_weather_map
+from components.ai_advisor import generate_weather_advice
 
 # 1. 頁面配置 (步驟 11 & 16)
 st.set_page_config(
@@ -215,8 +216,13 @@ if not region_df.empty:
             unsafe_allow_html=True,
         )
 
-    # 頁籤分頁設計：兼顧圖表分析、互動地圖與數據明細 (步驟 14, 15, 17~19)
-    tab_chart, tab_map, tab_table = st.tabs(["📈 氣溫趨勢分析 (折線圖)", "🗺️ 台灣互動氣象地圖 (Folium)", "📋 詳細預報資料表"])
+    # 頁籤分頁設計：兼顧圖表分析、互動地圖、AI生活顧問與數據明細 (步驟 14, 15, 17~19, 22)
+    tab_chart, tab_map, tab_ai, tab_table = st.tabs([
+        "📈 氣溫趨勢分析 (折線圖)",
+        "🗺️ 台灣互動氣象地圖 (Folium)",
+        "🤖 AI 智慧生活決策顧問",
+        "📋 詳細預報資料表",
+    ])
 
     with tab_chart:
         st.markdown(f"#### 📊 {selected_region} 未來時段氣溫預測走勢")
@@ -232,6 +238,74 @@ if not region_df.empty:
         # 繪製 Folium 地圖 (步驟 17 & 18 & 19)
         folium_map = create_taiwan_weather_map(all_forecasts_df, selected_region=selected_region)
         st_folium(folium_map, width="100%", height=520, returned_objects=[])
+
+    with tab_ai:
+        st.markdown(f"#### 🤖 {selected_region} AI 智慧生活決策顧問 (步驟 22 延伸應用)")
+        st.caption("結合最新氣象要素，為您自動推算今日穿搭、雨具需求、戶外休閒建議與擬真主播摘要。")
+
+        advice = generate_weather_advice(
+            selected_region,
+            float(latest_slot["minT"]),
+            float(latest_slot["maxT"]),
+            str(latest_slot["weatherCondition"]),
+            int(latest_slot["rainProbability"]),
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(
+                f"""
+                <div style="background:#f8fafc; border-left:4px solid {advice['clothing_color']}; padding:16px; border-radius:8px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="font-weight:700; font-size:1.05rem; color:#1e293b;">👔 今日穿搭指南 · <span style="color:{advice['clothing_color']}">{advice['clothing_level']}</span></div>
+                    <div style="margin-top:8px; color:#475569; font-size:0.95rem; line-height:1.5;">{advice['clothing_advice']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div style="background:#f8fafc; border-left:4px solid #0284c7; padding:16px; border-radius:8px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="font-weight:700; font-size:1.05rem; color:#1e293b;">☂️ 雨具攜帶提醒 · <span>{advice['umbrella_badge']}</span></div>
+                    <div style="margin-top:8px; color:#475569; font-size:0.95rem; line-height:1.5;">{advice['umbrella_advice']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with c2:
+            st.markdown(
+                f"""
+                <div style="background:#f8fafc; border-left:4px solid #10b981; padding:16px; border-radius:8px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="font-weight:700; font-size:1.05rem; color:#1e293b;">🏃 戶外休閒適宜度 · <span style="color:#059669;">{advice['activity_status']}</span></div>
+                    <div style="margin-top:8px; color:#475569; font-size:0.95rem; line-height:1.5;">{advice['activity_advice']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"""
+                <div style="background:#f1f5f9; border:1px solid #cbd5e1; padding:14px; border-radius:8px;">
+                    <div style="font-weight:700; font-size:0.95rem; color:#334155; margin-bottom:6px;">🎙️ AI 天氣主播播報稿</div>
+                    <div style="font-style:italic; color:#475569; font-size:0.92rem; line-height:1.6;">"{advice['broadcast_script']}"</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("---")
+        st.markdown("##### 🌟 全台好天氣出遊排行榜 (低降雨機率精選 TOP 5)")
+        latest_all = all_forecasts_df.groupby("regionName").first().reset_index()
+        top_destinations = latest_all.sort_values(by=["rainProbability", "maxT"], ascending=[True, False]).head(5)
+
+        top_cols = st.columns(len(top_destinations))
+        for idx, (_, row) in enumerate(top_destinations.iterrows()):
+            with top_cols[idx]:
+                st.metric(
+                    label=f"TOP {idx+1} {row['regionName']}",
+                    value=f"{row['maxT']}°C",
+                    delta=f"降雨率 {row['rainProbability']}%",
+                    delta_color="inverse",
+                )
 
     with tab_table:
         st.markdown(f"#### 📋 {selected_region} 預報明細數據表格 (步驟 15)")
