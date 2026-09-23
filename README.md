@@ -127,6 +127,9 @@ hw3 cwa/
 ├── .streamlit/
 │   └── config.toml          # Streamlit 自訂主題與伺服器設置
 ├── requirements.txt         # Python 依賴套件清單
+├── vercel.json              # Vercel 路由設定檔 (支援 Serverless / Wasm)
+├── index.html               # Vercel 部署入口 (Stlite Wasm 單頁應用)
+├── build_stlite.py          # 自動打包 Python 代碼為 index.html 之腳本
 ├── README.md                # 專案說明與規格文件
 ├── workflow.md              # 階段性開發流程與 Cheat Sheet
 ├── walkthrough.md           # 專案驗證報告與成果回顧
@@ -167,7 +170,7 @@ CWA_API_KEY=CWA-XXXXXXXXXXXXXXXXXXXXXXXX
 python fetch_weather.py
 ```
 
-### 5. 啟動 Web 儀表板
+### 5. 啟動本地 Web 儀表板
 ```bash
 python -m streamlit run app.py
 ```
@@ -177,6 +180,30 @@ python -m streamlit run app.py
 ```bash
 python -m unittest tests/test_weather.py
 ```
+
+---
+
+## 🌐 雲端部署教學 (Cloud Deployment)
+
+本專案支援 **Vercel** 與 **Streamlit Community Cloud** 雙部署模式：
+
+### 方式 A：部署到 Vercel (推薦，純前端無伺服器架構)
+專案已內建 [vercel.json](file:///c:/Users/user/hw3%20cwa/vercel.json) 與由 [build_stlite.py](file:///c:/Users/user/hw3%20cwa/build_stlite.py) 編譯之 [index.html](file:///c:/Users/user/hw3%20cwa/index.html)（基於 WebAssembly / Stlite），可在 Vercel 快速免費上線：
+1. 登入 [Vercel](https://vercel.com/)。
+2. 點擊 **"Add New..." ➔ "Project"**。
+3. 選擇並匯入您的 GitHub 儲存庫：`naz0914/0923`。
+4. **Framework Preset** 維持預設（Other），直接點擊 **"Deploy"**。
+5. 部署完成後即可獲得免費的 `https://your-project.vercel.app` 專屬網址！
+> 若日後修改了 Python 代碼，只需執行 `python build_stlite.py` 並推送到 GitHub，Vercel 將自動更新部署。
+
+### 方式 B：部署到 Streamlit Community Cloud (官方容器模式)
+1. 登入 [share.streamlit.io](https://share.streamlit.io/) 並使用 GitHub 帳號登入。
+2. 點擊 **"New app"**。
+3. 填入專案資訊：
+   - **Repository**：`naz0914/0923`
+   - **Branch**：`main`
+   - **Main file path**：`app.py`
+4. 點擊 **"Deploy!"** 即可由 Streamlit 官方免費託管運行。
 
 ---
 

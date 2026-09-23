@@ -17,6 +17,13 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
+# 支援 Pyodide / WebAssembly (Wasm / Vercel Stlite) 瀏覽器 HTTP 請求
+try:
+    import pyodide_http
+    pyodide_http.patch_all()
+except Exception:
+    pass
+
 # 避免 Windows 終端機 (cp950) 輸出 UTF-8 / Emoji 編碼異常
 if hasattr(sys.stdout, "reconfigure"):
     try:
