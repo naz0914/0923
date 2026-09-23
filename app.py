@@ -539,3 +539,14 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Vercel Serverless Python Runtime 相容導出 (避免 Vercel 尋找 app/handler 報錯)
+def handler(request=None, *args, **kwargs):
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "text/plain; charset=utf-8"},
+        "body": "Taiwan Weather Forecast Dashboard is online. Frontend is served via index.html (Stlite Wasm).",
+    }
+
+app = handler
+application = handler

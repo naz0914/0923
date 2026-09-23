@@ -1,0 +1,9 @@
+# .vercelignore
+# 避免不必要檔案上傳至 Vercel 構建環境
+.env
+.env.local
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+tests/
