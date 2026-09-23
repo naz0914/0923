@@ -1,0 +1,257 @@
+"""
+app.py
+台灣天氣預報 Web 應用程式 (Taiwan Weather Forecast Dashboard)
+對應教學步驟 11 ~ 20：
+- 步驟 11: Streamlit 入門與版面排版
+- 步驟 12: 從 SQLite 資料庫 (data.db) 讀取資料
+- 步驟 13: 縣市下拉選單互動選擇 (Select Region)
+- 步驟 14: 繪製最高與最低氣溫折線趨勢圖 (Plotly)
+- 步驟 15: 顯示詳細預報數據表格
+- 步驟 16: 整合現代化 Web App 介面 (指標卡片、氣象圖示)
+- 步驟 17~19: Folium 台灣互動天氣地圖整合
+- 步驟 20: 快取優化 (@st.cache_data) 與例外處理
+"""
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from streamlit_folium import st_folium
+
+# 引入本專案自訂模組
+from database import init_db, get_all_regions, get_forecast_by_region, get_all_forecasts
+from fetch_weather import update_weather_pipeline
+from components.charts import create_temperature_trend_chart
+from components.map_view import create_taiwan_weather_map
+
+# 1. 頁面配置 (步驟 11 & 16)
+st.set_page_config(
+    page_title="台灣天氣預報儀表板 | CWA Weather Forecast",
+    page_icon="🌤️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# 注入現代化自訂 CSS 樣式
+st.markdown(
+    """
+    <style>
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        color: #1E293B;
+        margin-bottom: 0.2rem;
+    }
+    .sub-header {
+        font-size: 1rem;
+        color: #64748B;
+        margin-bottom: 1.5rem;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 16px 20px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        margin-bottom: 15px;
+    }
+    .metric-title {
+        font-size: 0.85rem;
+        color: #64748B;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin-top: 4px;
+    }
+    .badge-pop {
+        display: inline-block;
+        background-color: #E0F2FE;
+        color: #0369A1;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+@st.cache_data(ttl=600)
+def load_all_forecast_data() -> pd.DataFrame:
+    """步驟 12 & 20：從 SQLite 資料庫讀取全部預報資料 (快取 10 分鐘)"""
+    init_db()
+    df = get_all_forecasts()
+    if df.empty:
+        # 若資料庫無資料，自動觸發一次抓取
+        update_weather_pipeline()
+        df = get_all_forecasts()
+    return df
+
+
+@st.cache_data(ttl=600)
+def load_regions_list() -> list:
+    """步驟 10 & 13：取得縣市清單"""
+    init_db()
+    regions = get_all_regions()
+    if not regions:
+        update_weather_pipeline()
+        regions = get_all_regions()
+    return regions
+
+
+# 載入資料
+all_forecasts_df = load_all_forecast_data()
+regions = load_regions_list()
+
+# 側邊欄控制項 (步驟 13)
+with st.sidebar:
+    st.image(
+        "https://images.unsplash.com/photo-1592210454359-9043f067919b?w=500&auto=format&fit=crop&q=60",
+        caption="CWA 氣象開放資料整合應用",
+        use_container_width=True,
+    )
+    st.title("⚙️ 儀表板控制台")
+    
+    # 縣市選擇下拉選單
+    default_index = regions.index("臺北市") if "臺北市" in regions else 0
+    selected_region = st.selectbox(
+        "📍 選擇縣市地區 (Select Region)：",
+        options=regions,
+        index=default_index,
+        help="切換欲查看一週/多時段預報之縣市",
+    )
+
+    st.markdown("---")
+    
+    # 一鍵更新按鈕
+    st.subheader("🔄 氣象資料同步")
+    if st.button("立即從氣象署更新資料", use_container_width=True):
+        with st.spinner("正在向中央氣象署 API 請求最新數據並寫入資料庫..."):
+            try:
+                update_weather_pipeline()
+                st.cache_data.clear()
+                st.success("✅ 更新成功！")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 更新失敗: {e}")
+
+    st.markdown("---")
+    st.markdown(
+        """
+        **💡 專案資訊**
+        - 資料來源：中央氣象署 CWA API
+        - 資料庫：SQLite (`data.db`)
+        - 開發工具：Antigravity IDE × Gemini
+        """
+    )
+
+
+# 主頁面頂部標題區
+col_header1, col_header2 = st.columns([3, 1])
+with col_header1:
+    st.markdown('<div class="main-header">🌤️ 台灣天氣預報儀表板</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="sub-header">即時觀測全台各縣市氣溫走勢、天氣現象與降雨機率 ｜ 目前關注地區：<b>{selected_region}</b></div>',
+        unsafe_allow_html=True,
+    )
+with col_header2:
+    if not all_forecasts_df.empty and "updated_at" in all_forecasts_df.columns:
+        last_updated = all_forecasts_df["updated_at"].max()
+        st.caption(f"🕒 資料庫更新時間：\n{last_updated}")
+
+
+# 取得選定縣市的預報資料
+region_df = all_forecasts_df[all_forecasts_df["regionName"] == selected_region].reset_index(drop=True)
+
+if not region_df.empty:
+    latest_slot = region_df.iloc[0]
+
+    # 步驟 16：頂部指標卡片 (Metric Cards)
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">目前預報時段最高溫</div>
+                <div class="metric-value" style="color: #E11D48;">{latest_slot['maxT']} °C</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m2:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">目前預報時段最低溫</div>
+                <div class="metric-value" style="color: #2563EB;">{latest_slot['minT']} °C</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m3:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">預報天氣現象</div>
+                <div class="metric-value" style="font-size: 1.4rem; color: #0F172A;">{latest_slot['weatherCondition']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m4:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="metric-title">預測降雨機率</div>
+                <div class="metric-value" style="color: #0284C7;">💧 {latest_slot['rainProbability']}%</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 頁籤分頁設計：兼顧圖表分析、互動地圖與數據明細 (步驟 14, 15, 17~19)
+    tab_chart, tab_map, tab_table = st.tabs(["📈 氣溫趨勢分析 (折線圖)", "🗺️ 台灣互動氣象地圖 (Folium)", "📋 詳細預報資料表"])
+
+    with tab_chart:
+        st.markdown(f"#### 📊 {selected_region} 未來時段氣溫預測走勢")
+        chart_fig = create_temperature_trend_chart(region_df, selected_region)
+        st.plotly_chart(chart_fig, use_container_width=True)
+
+        st.info("💡 **趨勢觀察提示**：折線呈現各時段最高與最低溫範圍，點擊或滑鼠懸停於節點可檢視詳細時段與精確溫度數值。")
+
+    with tab_map:
+        st.markdown("#### 🗺️ 全台灣縣市即時氣溫地理分佈圖")
+        st.caption("點擊地圖上的各縣市圓形氣溫標記，可展開該縣市的天氣現象與降雨機率卡片。")
+        
+        # 繪製 Folium 地圖 (步驟 17 & 18 & 19)
+        folium_map = create_taiwan_weather_map(all_forecasts_df, selected_region=selected_region)
+        st_folium(folium_map, width="100%", height=520, returned_objects=[])
+
+    with tab_table:
+        st.markdown(f"#### 📋 {selected_region} 預報明細數據表格 (步驟 15)")
+        
+        display_df = region_df.rename(
+            columns={
+                "regionName": "縣市名稱",
+                "validDate": "預報有效時段",
+                "minT": "最低溫 (°C)",
+                "maxT": "最高溫 (°C)",
+                "weatherCondition": "天氣現象",
+                "rainProbability": "降雨機率 (%)",
+                "updated_at": "記錄更新時間",
+            }
+        )
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+else:
+    st.warning("⚠️ 尚無該地區之預報數據，請點擊左側「立即從氣象署更新資料」按鈕。")
+
+# 頁尾
+st.markdown("---")
+st.caption("Taiwan Weather Forecast Dashboard | Developed with Streamlit & Folium | AI x Coding Vibe Coding")
