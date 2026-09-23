@@ -99,3 +99,56 @@ def create_temperature_trend_chart(region_df: pd.DataFrame, region_name: str) ->
     )
 
     return fig
+
+
+def create_multi_region_comparison_chart(all_df: pd.DataFrame, region_names: list) -> go.Figure:
+    """
+    多縣市氣溫對比分析折線圖 (對應步驟 22 延伸應用)
+    允許使用者同時選擇 2~5 個縣市進行最高氣溫對比
+    """
+    fig = go.Figure()
+    palette = ["#0284C7", "#E11D48", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"]
+
+    for idx, reg in enumerate(region_names):
+        sub_df = all_df[all_df["regionName"] == reg].reset_index(drop=True)
+        if sub_df.empty:
+            continue
+
+        time_labels = []
+        for d in sub_df["validDate"]:
+            parts = d.split("~")
+            if len(parts) == 2:
+                time_labels.append(f"{parts[0].strip()[5:16]}~{parts[1].strip()[11:16]}")
+            else:
+                time_labels.append(d)
+
+        color = palette[idx % len(palette)]
+        fig.add_trace(
+            go.Scatter(
+                x=time_labels,
+                y=sub_df["maxT"],
+                mode="lines+markers",
+                name=f"{reg} (最高溫)",
+                line=dict(color=color, width=3, shape="spline"),
+                marker=dict(size=8, color=color),
+                hovertemplate=f"<b>{reg}</b>: %{{y}}°C<extra></extra>",
+            )
+        )
+
+    fig.update_layout(
+        title={
+            "text": "📊 <b>跨縣市最高氣溫預報對比</b>",
+            "x": 0.05,
+            "xanchor": "left",
+            "font": {"size": 17, "color": "#1e293b"},
+        },
+        xaxis=dict(title="預報時段", tickangle=-15, showgrid=True, gridcolor="#f1f5f9"),
+        yaxis=dict(title="溫度 (°C)", showgrid=True, gridcolor="#f1f5f9"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=40, r=40, t=60, b=40),
+        hovermode="x unified",
+        height=380,
+    )
+    return fig

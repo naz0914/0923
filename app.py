@@ -20,9 +20,10 @@ from streamlit_folium import st_folium
 # 引入本專案自訂模組
 from database import init_db, get_all_regions, get_forecast_by_region, get_all_forecasts
 from fetch_weather import update_weather_pipeline
-from components.charts import create_temperature_trend_chart
+from components.charts import create_temperature_trend_chart, create_multi_region_comparison_chart
 from components.map_view import create_taiwan_weather_map
 from components.ai_advisor import generate_weather_advice
+from components.alerts import scan_weather_alerts
 
 # 1. 頁面配置 (步驟 11 & 16)
 st.set_page_config(
@@ -166,6 +167,22 @@ with col_header2:
         last_updated = all_forecasts_df["updated_at"].max()
         st.caption(f"🕒 資料庫更新時間：\n{last_updated}")
 
+# 步驟 22 防災應用：掃描全台極端天氣警報
+alerts = scan_weather_alerts(all_forecasts_df)
+if alerts:
+    with st.expander(f"⚠️ 全台即時氣候與防災預警提示 (共偵測到 {len(alerts)} 筆重點警示)", expanded=False):
+        alert_cols = st.columns(min(3, len(alerts)))
+        for idx, alt in enumerate(alerts[:3]):
+            with alert_cols[idx]:
+                st.markdown(
+                    f"""
+                    <div style="background:#FFF1F2; border-left:4px solid {alt['color']}; padding:10px 14px; border-radius:6px; margin-bottom:6px;">
+                        <div style="font-weight:bold; color:#9F1239; font-size:0.92rem;">{alt['title']}</div>
+                        <div style="font-size:0.83rem; color:#4C0519; margin-top:3px; line-height:1.4;">{alt['description']}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 # 取得選定縣市的預報資料
 region_df = all_forecasts_df[all_forecasts_df["regionName"] == selected_region].reset_index(drop=True)
@@ -230,6 +247,21 @@ if not region_df.empty:
         st.plotly_chart(chart_fig, use_container_width=True)
 
         st.info("💡 **趨勢觀察提示**：折線呈現各時段最高與最低溫範圍，點擊或滑鼠懸停於節點可檢視詳細時段與精確溫度數值。")
+
+        # 步驟 22 延伸應用：多縣市氣溫對比
+        st.markdown("---")
+        st.markdown("#### 🔄 跨縣市氣溫對比分析")
+        st.caption("同時挑選多個縣市，比較不同地區最高氣溫變化走勢。")
+        default_compare = [selected_region] + [r for r in ["臺北市", "臺中市", "高雄市"] if r != selected_region][:2]
+        compare_regions = st.multiselect(
+            "選擇要比較的縣市清單 (可多選)：",
+            options=regions,
+            default=default_compare,
+            key="multi_compare_select",
+        )
+        if compare_regions:
+            comp_fig = create_multi_region_comparison_chart(all_forecasts_df, compare_regions)
+            st.plotly_chart(comp_fig, use_container_width=True)
 
     with tab_map:
         st.markdown("#### 🗺️ 全台灣縣市即時氣溫地理分佈圖")
@@ -322,6 +354,16 @@ if not region_df.empty:
             }
         )
         st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        # 步驟 22 延伸應用：資料匯出下載
+        csv_data = display_df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            label=f"📥 下載 {selected_region} 預報資料 (CSV)",
+            data=csv_data,
+            file_name=f"{selected_region}_weather_forecast.csv",
+            mime="text/csv",
+            help="匯出包含預報有效時段、氣溫、降雨機率與天氣現象之 CSV 表格 (UTF-8 編碼相容 Excel)",
+        )
 
 else:
     st.warning("⚠️ 尚無該地區之預報數據，請點擊左側「立即從氣象署更新資料」按鈕。")

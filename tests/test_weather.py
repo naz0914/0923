@@ -107,6 +107,34 @@ class TestWeatherApp(unittest.TestCase):
         m = create_taiwan_weather_map(df, selected_region="臺北市")
         self.assertIsNotNone(m)
 
+    def test_weather_alerts_scanning(self):
+        """測試極端天氣與防災警報偵測機制"""
+        from components.alerts import scan_weather_alerts
+        mock_df = pd.DataFrame(
+            [
+                {"regionName": "嘉義市", "minT": 25.0, "maxT": 35.0, "weatherCondition": "晴天", "rainProbability": 10},
+                {"regionName": "宜蘭縣", "minT": 22.0, "maxT": 28.0, "weatherCondition": "豪雨", "rainProbability": 85},
+            ]
+        )
+        alerts = scan_weather_alerts(mock_df)
+        self.assertTrue(len(alerts) >= 2)
+        alert_types = [a["type"] for a in alerts]
+        self.assertIn("heat", alert_types)
+        self.assertIn("rain", alert_types)
+
+    def test_multi_region_comparison_chart(self):
+        """測試跨縣市對比圖表生成"""
+        from components.charts import create_multi_region_comparison_chart
+        mock_df = pd.DataFrame(
+            [
+                {"regionName": "臺北市", "validDate": "2026-09-23 06:00:00 ~ 2026-09-23 18:00:00", "maxT": 32.0},
+                {"regionName": "高雄市", "validDate": "2026-09-23 06:00:00 ~ 2026-09-23 18:00:00", "maxT": 34.0},
+            ]
+        )
+        fig = create_multi_region_comparison_chart(mock_df, ["臺北市", "高雄市"])
+        self.assertIsNotNone(fig)
+        self.assertEqual(len(fig.data), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
