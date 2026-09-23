@@ -1,7 +1,7 @@
 """
 components/map_view.py
-台灣氣象地圖視覺化模組 (對應教學步驟 17、18、19)
-使用 Folium 繪製全台各縣市氣溫標記與互動地圖
+台灣氣象地圖視覺化模組 (現代風格視覺化升級版)
+使用 Folium 繪製具備現代色彩標記、發光圈與精美彈窗之全台天氣地圖
 """
 
 import folium
@@ -36,32 +36,27 @@ TAIWAN_COORDINATES = {
 
 
 def get_temperature_color(max_t: Optional[float]) -> str:
-    """依據最高溫決定地圖標記顏色 (視覺化漸層)"""
+    """依據最高溫決定地圖標記現代漸層色 (Vibrant Modern Palette)"""
     if max_t is None:
-        return "#7f8c8d"  # 灰色
-    if max_t >= 32:
-        return "#e74c3c"  # 炎熱紅色
+        return "#94A3B8"
+    if max_t >= 33:
+        return "#F43F5E"  # 豔紅 (高溫警戒)
     elif max_t >= 28:
-        return "#e67e22"  # 溫暖橙色
+        return "#F59E0B"  # 琥珀金 (溫暖宜人)
     elif max_t >= 24:
-        return "#f1c40f"  # 適中黃色
+        return "#10B981"  # 翠綠 (適溫舒適)
     elif max_t >= 20:
-        return "#2ecc71"  # 舒適綠色
+        return "#0EA5E9"  # 蔚藍 (清爽涼快)
     else:
-        return "#3498db"  # 涼冷藍色
+        return "#6366F1"  # 靛藍 (偏冷防寒)
 
 
 def create_taiwan_weather_map(df: pd.DataFrame, selected_region: Optional[str] = None) -> folium.Map:
     """
-    步驟 17 & 18 & 19：建立台灣互動氣象地圖
-    - 取得各縣市的第一筆最新時段預報
-    - 在對應座標加上標記點與氣溫資訊
-    - 點擊標記可展開 Popup 詳細彈窗
+    步驟 17 & 18 & 19：建立現代風格台灣互動氣象地圖
     """
-    # 地圖中心預設在台灣本島中央
     center_lat, center_lon = 23.8, 121.0
     
-    # 若有選中特定縣市，將地圖中心微調至該縣市
     if selected_region and selected_region in TAIWAN_COORDINATES:
         center_lat, center_lon = TAIWAN_COORDINATES[selected_region]
 
@@ -81,8 +76,8 @@ def create_taiwan_weather_map(df: pd.DataFrame, selected_region: Optional[str] =
             continue
 
         lat, lon = TAIWAN_COORDINATES[region]
-        min_t = row.get("minT", "N/A")
-        max_t = row.get("maxT", "N/A")
+        min_t = row.get("minT", "--")
+        max_t = row.get("maxT", "--")
         wx = row.get("weatherCondition", "未知")
         pop = row.get("rainProbability", 0)
         valid_date = row.get("validDate", "")
@@ -90,32 +85,35 @@ def create_taiwan_weather_map(df: pd.DataFrame, selected_region: Optional[str] =
         is_selected = (region == selected_region)
         color = get_temperature_color(row.get("maxT"))
 
-        # HTML Popup 彈跳卡片
+        # 現代玻璃擬態 Popup 彈跳卡片
         popup_html = f"""
-        <div style="font-family: sans-serif; min-width: 170px; line-height: 1.5;">
-            <h4 style="margin: 0 0 6px 0; color: #2c3e50; border-bottom: 2px solid {color}; padding-bottom: 3px;">
-                📍 {region}
-            </h4>
-            <div style="font-size: 13px; color: #555;">
-                <p style="margin: 2px 0;"><b>天氣現象：</b>{wx}</p>
-                <p style="margin: 2px 0;"><b>氣溫區間：</b><span style="color:#2980b9; font-weight:bold;">{min_t}°C</span> ~ <span style="color:#c0392b; font-weight:bold;">{max_t}°C</span></p>
-                <p style="margin: 2px 0;"><b>降雨機率：</b>💧 {pop}%</p>
-                <p style="margin: 4px 0 0 0; font-size: 11px; color: #888;">{valid_date.split('~')[0].strip()}</p>
+        <div style="font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; min-width: 190px; padding: 4px; line-height: 1.5;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid {color}; padding-bottom: 6px; margin-bottom: 8px;">
+                <span style="font-size: 16px; font-weight: 700; color: #0F172A;">📍 {region}</span>
+                <span style="font-size: 11px; background: {color}20; color: {color}; padding: 2px 7px; border-radius: 12px; font-weight: 700;">{max_t}°C</span>
+            </div>
+            <div style="font-size: 13px; color: #334155;">
+                <p style="margin: 3px 0;">🌤️ <b>預報天氣：</b>{wx}</p>
+                <p style="margin: 3px 0;">🌡️ <b>溫差區間：</b><b style="color:#0284C7;">{min_t}°C</b> ~ <b style="color:#E11D48;">{max_t}°C</b></p>
+                <p style="margin: 3px 0;">💧 <b>降雨機率：</b><b style="color:#0369A1;">{pop}%</b></p>
+                <div style="margin-top: 8px; font-size: 11px; color: #94A3B8; border-top: 1px dashed #E2E8F0; padding-top: 4px;">
+                    {valid_date.split('~')[0].strip() if '~' in valid_date else valid_date}
+                </div>
             </div>
         </div>
         """
 
-        # 圓形標記
+        # 現代圓形標記
         folium.CircleMarker(
             location=[lat, lon],
-            radius=11 if is_selected else 7,
-            color="#2c3e50" if is_selected else color,
-            weight=3 if is_selected else 1.5,
+            radius=12 if is_selected else 8,
+            color="#0F172A" if is_selected else "#FFFFFF",
+            weight=3.5 if is_selected else 2,
             fill=True,
             fill_color=color,
-            fill_opacity=0.9 if is_selected else 0.75,
-            tooltip=f"{region}: {min_t}°C ~ {max_t}°C ({wx})",
-            popup=folium.Popup(popup_html, max_width=300),
+            fill_opacity=0.92 if is_selected else 0.82,
+            tooltip=f"<b>{region}</b>: {min_t}°C ~ {max_t}°C ({wx})",
+            popup=folium.Popup(popup_html, max_width=320),
         ).add_to(m)
 
     return m
