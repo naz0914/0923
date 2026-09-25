@@ -63,7 +63,7 @@ def create_taiwan_weather_map(df: pd.DataFrame, selected_region: Optional[str] =
     m = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=7 if not selected_region else 8,
-        tiles="OpenStreetMap",
+        tiles="CartoDB positron",
         control_scale=True,
     )
 
